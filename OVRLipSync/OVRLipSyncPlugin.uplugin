@@ -1,0 +1,20 @@
+{
+    "FileVersion" : 3,
+	"FriendlyName" : "Oculus LipSync Plugin",
+	"Version" : 1,
+	"VersionName" : "0.8.8",
+	"CreatedBy" : "n00854180t",
+	"CreatedByURL" : "http://storyteller-vr.com",
+	"DocsURL" : "https://github.com/chairgraveyard/ovrlipsync-ue4",
+	"Description" : "Unofficial plugin for the Oculus LipSync Library",
+	"Category" : "Audio",
+    "Modules" :
+	[
+		{
+			"Name" : "OVRLipSyncPlugin",
+			"Type" : "Runtime",
+            "LoadingPhase": "PostConfigInit",
+			"WhitelistPlatforms" : [ "Win64", "Win32" ]
+		}
+	]
+}
