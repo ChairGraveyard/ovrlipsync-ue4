@@ -1,8 +1,8 @@
 {
-	"Changelist" : 2927265,
-	"BuildId" : "32b25d7d-761b-439b-aa4c-1b424c5829ad",
+	"Changelist" : 2946394,
+	"BuildId" : "1a11ac38-4fe4-43fd-9c4d-f4d0bf86c823",
 	"Modules" : 
 	{
-		"HydraPlugin" : "UE4Editor-HydraPlugin.dll"
+		"OVRLipSync" : "UE4Editor-OVRLipSync.dll"
 	}
 }
