@@ -1,14 +1,16 @@
 
 #pragma once
 
-#include "VisemeGenerationWorker.h"
+#include "IPluginManager.h"
 #include "TaskGraphInterfaces.h"
+#include "VisemeGenerationWorker.h"
 #include "VisemeGenerationActor.generated.h"
 
 
 //DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVisemeGeneratedSignature, FString, Text);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FVisemeGeneratedSignature, int32, FrameNumber, int32, FrameDelay, TArray<float>, Visemes);
+//DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FVisemeGeneratedSignature, int32, FrameNumber, int32, FrameDelay, TArray<float>, Visemes);
+
 
 // Error codes that may return from Lip-Sync engine
 enum ovrLipSyncError
@@ -68,7 +70,7 @@ enum ovrLipSyncContextProvider
 	Other
 };
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FOVRLipSyncFrame
 {
 	GENERATED_BODY()
@@ -77,7 +79,7 @@ struct FOVRLipSyncFrame
 	{
 		FrameNumber = 0;
 		FrameDelay = 0;
-		Visemes.Reserve((int)ovrLipSyncViseme::VisemesCount);
+		Visemes.AddDefaulted((int)ovrLipSyncViseme::VisemesCount);		
 	}
 
 	void CopyInput(FOVRLipSyncFrame &input)
@@ -88,15 +90,17 @@ struct FOVRLipSyncFrame
 		Visemes.Append(input.Visemes);		
 	}
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = LipSync)
 		int   	FrameNumber; 		// count from start of recognition
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = LipSync)
 		int   	FrameDelay;  		// in ms
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = LipSync)
 		TArray<float> 	Visemes;	// Array of floats for viseme frame. Size of Viseme Count, above
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVisemeGeneratedSignature, FOVRLipSyncFrame, LipSyncFrame);
 
 UCLASS(BlueprintType, Blueprintable)
 class OVRLIPSYNC_API AVisemeGenerationActor : public AActor
@@ -113,7 +117,7 @@ private:
 
 	ovrLipSyncContextProvider ContextProvider = ovrLipSyncContextProvider::Main;
 
-	FOVRLipSyncFrame CurrentFrame;
+	
 	FOVRLipSyncFrame LastFrame;
 
 	int32 instanceCtr;
@@ -121,13 +125,15 @@ private:
 	FVisemeGenerationWorker* listenerThread;
 
 	//static void VisemeGenerated_trigger(FVisemeGeneratedSignature delegate_method, FString text);
-	static void VisemeGenerated_trigger(FVisemeGeneratedSignature delegate_method, int32 FrameNumber, int32 FrameDelay, TArray<float> Visemes);
+	//static void VisemeGenerated_trigger(FVisemeGeneratedSignature delegate_method, int32 FrameNumber, int32 FrameDelay, TArray<float> Visemes);
+	static void VisemeGenerated_trigger(FVisemeGeneratedSignature delegate_method, FOVRLipSyncFrame LipSyncFrame);
 
 public:
 	
 	AVisemeGenerationActor();
 
 	const int ovrLipSyncSuccess = 0;
+	FOVRLipSyncFrame CurrentFrame;
 
 	// Basic functions 
 	UFUNCTION(BlueprintCallable, Category = "Audio", meta = (DisplayName = "Init", Keywords = "Viseme Generation Init"))		
@@ -136,11 +142,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Audio", meta = (DisplayName = "Shutdown", Keywords = "Viseme Generation Shutdown"))
 	bool Shutdown();
 
+	//void VisemeGenerated_method(int32 FrameNumber, int32 FrameDelay, TArray<float> Visemes);
 	UFUNCTION()
-	void VisemeGenerated_method(int32 FrameNumber, int32 FrameDelay, TArray<float> Visemes);
+	void VisemeGenerated_method(FOVRLipSyncFrame LipSyncFrame);
 
 	UPROPERTY(BlueprintAssignable, Category = "Audio")
-		FVisemeGeneratedSignature OnVisemeGenerated;
+	FVisemeGeneratedSignature OnVisemeGenerated;
 
 	int IsInitialized() { return sOVRLipSyncInit; }
 

@@ -34,7 +34,15 @@ AVisemeGenerationActor::AVisemeGenerationActor(const FObjectInitializer& ObjectI
 
 	//Define Paths for direct dll bind
 	FString BinariesRoot = FPaths::Combine(*FPaths::GameDir(), TEXT("Binaries"));
-	FString PluginRoot = IPluginManager::Get().FindPlugin("OVRLipSyncPlugin")->GetBaseDir();
+	IPluginManager &plgnMgr = IPluginManager::Get();
+	TSharedPtr<IPlugin> plugin = plgnMgr.FindPlugin("OVRLipSync");
+	if (!plugin.IsValid())
+	{ 
+		UE_LOG(OVRLipSyncPluginLog, Error, TEXT("Plugin not found."));
+		return;
+	}
+
+	FString PluginRoot = plugin->GetBaseDir();
 	FString PlatformString;
 	FString OVRDLLString;
 
@@ -49,7 +57,7 @@ AVisemeGenerationActor::AVisemeGenerationActor(const FObjectInitializer& ObjectI
 	PlatformString = FString(TEXT("Win32"));
 #endif
 #else
-	UE_LOG(LogClass, Error, TEXT("Unsupported Platform. Hydra Unavailable."));
+	UE_LOG(OVRLipSyncPluginLog, Error, TEXT("Unsupported Platform. Hydra Unavailable."));
 #endif
 
 	FString DllFilepath = FPaths::ConvertRelativePathToFull(FPaths::Combine(*PluginRoot, TEXT("Binaries"), *PlatformString, *OVRDLLString));
@@ -84,20 +92,24 @@ AVisemeGenerationActor::AVisemeGenerationActor(const FObjectInitializer& ObjectI
 	OVRLipSyncProcessFrameInterleaved = (dll_ovrlipsyncProcessFrameInterleaved)FPlatformProcess::GetDllExport(OVRDLLHandle, TEXT("ovrLipSyncDll_ProcessFrameInterleaved"));
 
 
-	InitLipSync(16000, 1024);
+	InitLipSync(16000, 2048);
 	if (CreateContext(&CurrentContext, ContextProvider) != ovrLipSyncSuccess)
 		UE_LOG(OVRLipSyncPluginLog, Error, TEXT("Unable to create OVR LipSync Context"));
 
 
 #endif // PLATFORM_WINDOWS
-	{
-		UE_LOG(OVRLipSyncPluginLog, Error, TEXT("Failed to load third party library"));
-	}
 }
 
 bool AVisemeGenerationActor::Init()
 {
-	
+	LastFrame.FrameDelay = LastFrame.FrameNumber = CurrentFrame.FrameDelay = CurrentFrame.FrameNumber = 0;
+
+	LastFrame.Visemes.Empty();
+	CurrentFrame.Visemes.Empty();
+
+	LastFrame.Visemes.AddDefaulted((int)ovrLipSyncViseme::VisemesCount);
+	CurrentFrame.Visemes.AddDefaulted((int)ovrLipSyncViseme::VisemesCount);
+
 	// terminate any existing thread
 	if (listenerThread != NULL)
 		Shutdown();
@@ -124,16 +136,16 @@ bool AVisemeGenerationActor::Shutdown()
 	}
 }
 
-void AVisemeGenerationActor::VisemeGenerated_trigger(FVisemeGeneratedSignature delegate_method, int32 FrameNumber, int32 FrameDelay, TArray<float> Visemes)
+void AVisemeGenerationActor::VisemeGenerated_trigger(FVisemeGeneratedSignature delegate_method, FOVRLipSyncFrame LipSyncFrame)
 {
-	delegate_method.Broadcast(FrameNumber, FrameDelay, Visemes);
+	delegate_method.Broadcast(LipSyncFrame);
 }
 
-void AVisemeGenerationActor::VisemeGenerated_method(int32 FrameNumber, int32 FrameDelay, TArray<float> Visemes)
+void AVisemeGenerationActor::VisemeGenerated_method(FOVRLipSyncFrame LipSyncFrame)
 {
 	FSimpleDelegateGraphTask::CreateAndDispatchWhenReady
 		(
-		FSimpleDelegateGraphTask::FDelegate::CreateStatic(&VisemeGenerated_trigger, OnVisemeGenerated, FrameNumber, FrameDelay, Visemes)
+		FSimpleDelegateGraphTask::FDelegate::CreateStatic(&VisemeGenerated_trigger, OnVisemeGenerated, LipSyncFrame)
 		, TStatId()
 		, nullptr
 		, ENamedThreads::GameThread
@@ -203,7 +215,7 @@ int AVisemeGenerationActor::ProcessFrameInterleaved(unsigned int Context, float 
 
 int AVisemeGenerationActor::ProcessFrameExternal(float *AudioBuffer, ovrLipSyncFlag Flags)
 {
-	LastFrame.CopyInput(CurrentFrame);
+	//LastFrame.CopyInput(CurrentFrame);
 	return ProcessFrame(CurrentContext, AudioBuffer, Flags, &CurrentFrame);
 }
 

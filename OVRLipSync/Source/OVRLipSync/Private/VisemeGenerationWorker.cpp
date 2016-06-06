@@ -16,6 +16,8 @@ void FVisemeGenerationWorker::ShutDown() {
 	Stop();
 	Thread->WaitForCompletion();
 	delete Thread;
+
+	delete[] sampleBuf;
 }
 
 bool FVisemeGenerationWorker::Init() {
@@ -27,14 +29,17 @@ bool FVisemeGenerationWorker::Init() {
 		return InitSuccess;
 	}
 
-	// Initialisation:
-	VoiceCapture = FVoiceModule::Get().CreateVoiceCapture();
-	if (!VoiceCapture->Start())
+	if (!VoiceCapture.IsValid() || !VoiceCapture->Start())
 	{
 		ClientMessage(FString(TEXT("Failed to open audio device")));
 		InitSuccess = false;
 		return InitSuccess;
 	}
+
+	memset(buf, 0, VISEME_BUF_SIZE);
+	
+	uint32 samples = VISEME_BUF_SIZE / 2;
+	sampleBuf = new float[samples];
 
 	InitSuccess = true;
 
@@ -42,6 +47,12 @@ bool FVisemeGenerationWorker::Init() {
 }
 
 uint32 FVisemeGenerationWorker::Run() {
+
+	if (!Manager || Manager->ovrLipSyncSuccess < 0)
+	{
+		ClientMessage(FString(TEXT("Pending delete on Manager object")));
+		return 1;
+	}
 
 	if (!VoiceCapture->Start())
 	{
@@ -61,13 +72,12 @@ uint32 FVisemeGenerationWorker::Run() {
 		EVoiceCaptureState::Type captureState = VoiceCapture->GetCaptureState(bytesAvailable);
 		if (captureState == EVoiceCaptureState::Ok && bytesAvailable > 0)
 		{
-			uint8 buf[2048];
-			memset(buf, 0, 2048);
+			uint8 buf[VISEME_BUF_SIZE];
+		
 			uint32 readBytes = 0;
-			VoiceCapture->GetVoiceData(buf, 1024, readBytes);
+			VoiceCapture->GetVoiceData(buf, VISEME_BUF_SIZE, readBytes);
 
-			uint32 samples = readBytes / 2;
-			float* sampleBuf = new float[samples];
+			uint32 samples = VISEME_BUF_SIZE / 2;
 
 			int16_t sample;
 			for (uint32 i = 0; i < samples; i++)
@@ -81,15 +91,15 @@ uint32 FVisemeGenerationWorker::Run() {
 			int FrameDelay = 0;
 			int FrameNumber = 0;
 			TArray<float> Visemes;
-
+			Visemes.Reserve((int)ovrLipSyncViseme::VisemesCount);
 
 			Manager->ProcessFrameExternal(sampleBuf, (ovrLipSyncFlag)Flags);
 
 			Manager->GetFrameInfo(&FrameNumber, &FrameDelay, &Visemes);
 
-			Manager->VisemeGenerated_method(FrameNumber, FrameDelay, Visemes);
+			Manager->VisemeGenerated_method(Manager->CurrentFrame);
 
-			delete[] sampleBuf;
+
 		}
 	}
 
@@ -105,6 +115,11 @@ void FVisemeGenerationWorker::Stop() {
 bool FVisemeGenerationWorker::StartThread(AVisemeGenerationActor* manager) {
 	Manager = manager;
 	
+	// Initialisation:
+	VoiceCapture = FVoiceModule::Get().CreateVoiceCapture();
+	if (!VoiceCapture.IsValid())
+		InitSuccess = false;
+
 	int32 threadIdx = ILipSync::Get().GetInstanceCounter();
 	FString threadName = FString("FVisemeGenerationWorker:") + FString::FromInt(threadIdx);
 	InitSuccess = true;
