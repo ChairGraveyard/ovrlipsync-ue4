@@ -162,6 +162,11 @@ public:
 
 	int ProcessFrameExternal(float *AudioBuffer, ovrLipSyncFlag Flags);
 
+	int CreateContextExternal();
+	int DestroyContextExternal();
+
+	void ClearCurrentFrame();
+
 	int GetPhonemeFrame(FOVRLipSyncFrame *OutFrame);
 
 	void GetFrameInfo(int *OutFrameNumber, int *OutFrameDelay, TArray<float> *OutVisemes);

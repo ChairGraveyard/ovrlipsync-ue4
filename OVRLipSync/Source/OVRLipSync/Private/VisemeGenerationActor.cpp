@@ -92,10 +92,6 @@ AVisemeGenerationActor::AVisemeGenerationActor(const FObjectInitializer& ObjectI
 	OVRLipSyncProcessFrameInterleaved = (dll_ovrlipsyncProcessFrameInterleaved)FPlatformProcess::GetDllExport(OVRDLLHandle, TEXT("ovrLipSyncDll_ProcessFrameInterleaved"));
 
 
-	InitLipSync(16000, 2048);
-	if (CreateContext(&CurrentContext, ContextProvider) != ovrLipSyncSuccess)
-		UE_LOG(OVRLipSyncPluginLog, Error, TEXT("Unable to create OVR LipSync Context"));
-
 
 #endif // PLATFORM_WINDOWS
 }
@@ -152,6 +148,26 @@ void AVisemeGenerationActor::VisemeGenerated_method(FOVRLipSyncFrame LipSyncFram
 		);
 
 
+}
+
+int AVisemeGenerationActor::CreateContextExternal()
+{
+	int result = CreateContext(&CurrentContext, ContextProvider);
+	if (result != ovrLipSyncSuccess)
+		UE_LOG(OVRLipSyncPluginLog, Error, TEXT("Unable to create OVR LipSync Context"));
+
+	return result;
+}
+
+int AVisemeGenerationActor::DestroyContextExternal()
+{
+	return DestroyContext(CurrentContext);
+}
+
+void AVisemeGenerationActor::ClearCurrentFrame()
+{
+	CurrentFrame.Visemes.Empty();
+	CurrentFrame.Visemes.AddDefaulted((int)ovrLipSyncViseme::VisemesCount);
 }
 
 int AVisemeGenerationActor::InitLipSync(int SampleRate, int BufferSize)

@@ -7,7 +7,8 @@ class AVisemeGenerationActor;
 
 using namespace std;
 
-#define VISEME_BUF_SIZE 4096
+#define VISEME_BUF_SIZE 11000
+#define VISEME_SAMPLES 5500
 
 class FVisemeGenerationWorker :public FRunnable
 {
@@ -15,7 +16,7 @@ class FVisemeGenerationWorker :public FRunnable
 private:
 
 	uint8 buf[VISEME_BUF_SIZE];
-	float* sampleBuf;
+	float sampleBuf[VISEME_SAMPLES];
 
 	TSharedPtr<class IVoiceCapture> VoiceCapture;
 

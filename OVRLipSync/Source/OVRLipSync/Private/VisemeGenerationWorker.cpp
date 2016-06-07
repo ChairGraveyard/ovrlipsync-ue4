@@ -17,7 +17,8 @@ void FVisemeGenerationWorker::ShutDown() {
 	Thread->WaitForCompletion();
 	delete Thread;
 
-	delete[] sampleBuf;
+	Manager->DestroyContextExternal();
+	Manager->ShutdownLipSync();
 }
 
 bool FVisemeGenerationWorker::Init() {
@@ -36,10 +37,12 @@ bool FVisemeGenerationWorker::Init() {
 		return InitSuccess;
 	}
 
+
+	Manager->InitLipSync(16000, VISEME_SAMPLES);
+	Manager->CreateContextExternal();
+
 	memset(buf, 0, VISEME_BUF_SIZE);
-	
-	uint32 samples = VISEME_BUF_SIZE / 2;
-	sampleBuf = new float[samples];
+	memset(sampleBuf, 0, VISEME_SAMPLES * sizeof(float));
 
 	InitSuccess = true;
 
@@ -53,7 +56,7 @@ uint32 FVisemeGenerationWorker::Run() {
 		ClientMessage(FString(TEXT("Pending delete on Manager object")));
 		return 1;
 	}
-
+	
 	if (!VoiceCapture->Start())
 	{
 		ClientMessage(FString(TEXT("Failed to start recording")));
@@ -65,22 +68,21 @@ uint32 FVisemeGenerationWorker::Run() {
 		ClientMessage(FString(TEXT("OVR Lip Sync not initialized")));
 		return 3;
 	}
-	while (StopTaskCounter.GetValue() == 0) 
+
+	while (StopTaskCounter.GetValue() == 0)
 	{
 		// Capturing samples:
 		uint32 bytesAvailable = 0;
 		EVoiceCaptureState::Type captureState = VoiceCapture->GetCaptureState(bytesAvailable);
 		if (captureState == EVoiceCaptureState::Ok && bytesAvailable > 0)
 		{
-			uint8 buf[VISEME_BUF_SIZE];
-		
+			memset(buf, 0, VISEME_BUF_SIZE);
+
 			uint32 readBytes = 0;
 			VoiceCapture->GetVoiceData(buf, VISEME_BUF_SIZE, readBytes);
 
-			uint32 samples = VISEME_BUF_SIZE / 2;
-
 			int16_t sample;
-			for (uint32 i = 0; i < samples; i++)
+			for (uint32 i = 0; i < VISEME_SAMPLES; i++)
 			{
 				sample = (buf[i * 2 + 1] << 8) | buf[i * 2];
 				sampleBuf[i] = float(sample) / 32768.0f;
@@ -88,18 +90,10 @@ uint32 FVisemeGenerationWorker::Run() {
 
 			// Do fun stuff here
 			uint32 Flags = 0;
-			int FrameDelay = 0;
-			int FrameNumber = 0;
-			TArray<float> Visemes;
-			Visemes.Reserve((int)ovrLipSyncViseme::VisemesCount);
 
 			Manager->ProcessFrameExternal(sampleBuf, (ovrLipSyncFlag)Flags);
 
-			Manager->GetFrameInfo(&FrameNumber, &FrameDelay, &Visemes);
-
 			Manager->VisemeGenerated_method(Manager->CurrentFrame);
-
-
 		}
 	}
 
